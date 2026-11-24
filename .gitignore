@@ -1,0 +1,9 @@
+build/
+*.3dsx
+*.elf
+*.smdh
+*.map
+tests/test_main
+tests/preview/preview
+tests/preview/out/
+__pycache__/
