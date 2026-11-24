@@ -195,9 +195,9 @@ For the `.cia`, run `tools/make_cia.sh` after `make` (needs
 [bannertool](https://github.com/Epicpkmn11/bannertool)). The icon, banner and
 CIA settings are in `cia/`.
 
-GitHub Actions builds both files on every push. Pushing a tag like `v1.0.0`
-publishes a release with `3dsmaps.cia` and `3dsmaps.3dsx`, which is what the
-FBI QR code downloads.
+GitHub Actions builds both files on every push. Every push to `main` publishes
+them as the release for the version in `VERSION` (for example `v1.0.0`), which is
+what the FBI QR code downloads. Bump `VERSION` to start a new release.
 
 PC unit tests (NMEA parser, map drawing, map maths, search/route parsing): `make -C tests`.
 
