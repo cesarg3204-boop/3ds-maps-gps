@@ -1,8 +1,19 @@
 # 3DS Maps
 
-A map app for the Nintendo 3DS (homebrew) that uses your **phone as the GPS**.
-The 3DS shows OpenStreetMap tiles on the top screen with a blue dot for your
-position; the phone sends its location to the 3DS over Wi-Fi.
+<img src="cia/banner.png" alt="3DS Maps banner" width="256">
+
+**3DS Maps** turns a Nintendo 3DS into a GPS navigator. It uses your **phone as
+the GPS**: the phone sends its location over Wi-Fi, and the 3DS shows an
+OpenStreetMap map with a live blue dot for where you are.
+
+* Scrollable, zoomable OpenStreetMap map on the top screen, downloaded through
+  your phone's hotspot and saved to the SD card so places you've seen work offline.
+* Touch-screen menu on the bottom screen: search for a place, pick **car** or
+  **walking**, and tap **Go**.
+* Turn-by-turn directions with arrows, distance to the next turn, time left and
+  arrival time. If you go off the route, it finds a new one.
+* Works with the free Android app **Share GPS** (TCP/IP server mode), any app
+  that sends NMEA GPS data, or just Chrome on the phone.
 
 ```
  phone (GPS)  --Wi-Fi hotspot-->  3DS
@@ -20,13 +31,32 @@ position; the phone sends its location to the 3DS over Wi-Fi.
 
 ## Install
 
-1. Copy `3dsmaps.3dsx` to `SD:/3ds/3dsmaps/3dsmaps.3dsx`
-   (the `SD` folder in this package already has that layout, copy it over).
-2. Optional: copy a `tiles` folder to `SD:/3ds/3dsmaps/tiles` for offline maps
-   (see "Offline maps" below).
-3. Connect the 3DS to your phone's hotspot (System Settings → Internet Settings).
-4. Open **3DS Maps** from the Homebrew Launcher. The first run creates
-   `SD:/3ds/3dsmaps/config.ini`.
+### With FBI (scan the QR code)
+
+<img src="docs/qr-fbi.png" alt="QR code to install 3DS Maps with FBI" width="200">
+
+1. Connect the 3DS to the internet (your phone's hotspot works).
+2. Open **FBI** → **Remote Install** → **Scan QR Code**.
+3. Point the 3DS camera at this QR code and confirm. FBI downloads and installs
+   the latest `3dsmaps.cia`.
+4. **3DS Maps** now has its own icon on the HOME Menu.
+
+The QR code always points at the newest release:
+`https://github.com/cesarg3204-boop/3ds-maps-gps/releases/latest/download/3dsmaps.cia`
+
+### Homebrew Launcher (.3dsx)
+
+1. Download `3dsmaps.3dsx` from the
+   [latest release](https://github.com/cesarg3204-boop/3ds-maps-gps/releases/latest)
+   and copy it to `SD:/3ds/3dsmaps/3dsmaps.3dsx`.
+2. Open **3DS Maps** from the Homebrew Launcher.
+
+### After installing
+
+* Connect the 3DS to your phone's hotspot (System Settings → Internet Settings).
+* The first run creates `SD:/3ds/3dsmaps/config.ini`; you don't need to edit it.
+* Optional: copy a `tiles` folder to `SD:/3ds/3dsmaps/tiles` for offline maps
+  (see "Offline maps" below).
 
 ## Sending the phone's GPS
 
@@ -159,6 +189,15 @@ Needs devkitPro (devkitARM, libctru, and the 3ds-curl, 3ds-mbedtls, 3ds-libpng,
 ```
 docker run --rm -v "$PWD":/src -w /src devkitpro/devkitarm make
 ```
+
+For the `.cia`, run `tools/make_cia.sh` after `make` (needs
+[makerom](https://github.com/3DSGuy/Project_CTR) and
+[bannertool](https://github.com/Epicpkmn11/bannertool)). The icon, banner and
+CIA settings are in `cia/`.
+
+GitHub Actions builds both files on every push. Pushing a tag like `v1.0.0`
+publishes a release with `3dsmaps.cia` and `3dsmaps.3dsx`, which is what the
+FBI QR code downloads.
 
 PC unit tests (NMEA parser, map drawing, map maths, search/route parsing): `make -C tests`.
 
