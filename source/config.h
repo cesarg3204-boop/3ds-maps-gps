@@ -17,6 +17,7 @@ typedef struct {
 
 void config_defaults(Config *c);
 void config_load(Config *c, const char *path);   /* creates the file with defaults if missing */
+void config_save(const Config *c, const char *path);
 
 /* Last viewed position, so the map opens where you left it. */
 bool state_load(double *lat, double *lon, int *zoom);

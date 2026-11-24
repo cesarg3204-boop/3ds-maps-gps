@@ -387,7 +387,7 @@ typedef enum { UI_HOME, UI_RESULTS, UI_INFO } UiMode;
 
 typedef enum {
 	ACT_NONE, ACT_SEARCH, ACT_FOLLOW, ACT_ZOOM_IN, ACT_ZOOM_OUT, ACT_INFO, ACT_BACK,
-	ACT_GO, ACT_END_ROUTE, ACT_MODE_CHANGED, ACT_TOGGLE_TILES, ACT_SELECT
+	ACT_GO, ACT_END_ROUTE, ACT_MODE_CHANGED, ACT_TOGGLE_TILES, ACT_SELECT, ACT_PHONE_IP
 } Action;
 
 static Action screen_home(const GpsNet *g, bool *walking, bool follow, const char *msg)
@@ -621,9 +621,10 @@ static Action screen_info(const GpsNet *g, const Config *cfg, int z, double clat
 	info_row(y, "Map", v, C_TXT);
 	if (tiles_last_error()[0]) text_fit(10, 194, tiles_last_error(), 1, 300, C_WARN);
 
-	if (button(6, 204, 150, 32, tiles_online() ? "Tiles: ONLINE" : "Tiles: OFFLINE", 1,
+	if (button(6, 204, 100, 32, tiles_online() ? "Tiles: ON" : "Tiles: OFF", 1,
 	           tiles_online() ? C_GO : C_WARN, C_TXT)) a = ACT_TOGGLE_TILES;
-	if (button(164, 204, 150, 32, "Back to map", 1, C_CARD, C_TXT)) a = ACT_BACK;
+	if (button(110, 204, 100, 32, "Phone IP", 1, C_ACC, C_TXT)) a = ACT_PHONE_IP;
+	if (button(214, 204, 100, 32, "Back", 1, C_CARD, C_TXT)) a = ACT_BACK;
 	return a;
 }
 
@@ -642,6 +643,30 @@ static bool ask_search_text(char *out, int n, const char *last)
 	SwkbdButton b = swkbdInputText(&kb, buf, sizeof(buf));
 	if (b != SWKBD_BUTTON_RIGHT || !buf[0]) return false;
 	snprintf(out, n, "%s", buf);
+	return true;
+}
+
+/* Phone address: "auto", an IP like 192.168.43.1, or "off". */
+static bool ask_phone_ip(char *out, int n)
+{
+	SwkbdState kb;
+	swkbdInit(&kb, SWKBD_TYPE_WESTERN, 2, n - 1);
+	swkbdSetHintText(&kb, "Phone IP, or auto");
+	swkbdSetButton(&kb, SWKBD_BUTTON_LEFT, "Cancel", false);
+	swkbdSetButton(&kb, SWKBD_BUTTON_RIGHT, "OK", true);
+	swkbdSetValidation(&kb, SWKBD_NOTEMPTY_NOTBLANK, 0, 0);
+	swkbdSetInitialText(&kb, out);
+	char buf[64] = {0};
+	if (swkbdInputText(&kb, buf, sizeof(buf)) != SWKBD_BUTTON_RIGHT) return false;
+	char *s = buf;
+	while (*s == ' ') s++;
+	char *e = s + strlen(s);
+	while (e > s && e[-1] == ' ') *--e = 0;
+	for (char *c = s; *c; c++) if (*c >= 'A' && *c <= 'Z') *c += 32;
+	if (!*s) return false;
+	struct in_addr a;
+	if (strcmp(s, "auto") && strcmp(s, "off") && !inet_aton(s, &a)) return false;
+	snprintf(out, n, "%s", s);
 	return true;
 }
 
@@ -799,6 +824,13 @@ int main(void)
 		case ACT_INFO: ui = UI_INFO; break;
 		case ACT_FOLLOW: follow = true; break;
 		case ACT_TOGGLE_TILES: tiles_set_online(!tiles_online()); break;
+		case ACT_PHONE_IP:
+			if (ask_phone_ip(cfg.phone_ip, sizeof(cfg.phone_ip))) {
+				gps_net_set_phone(&gps, cfg.phone_ip);
+				config_save(&cfg, APP_DIR "/config.ini");
+				SAY("Phone: %s", cfg.phone_ip);
+			}
+			break;
 		case ACT_END_ROUTE:
 			if (have_route) { route_free(&route); have_route = false; msg[0] = 0; }
 			break;

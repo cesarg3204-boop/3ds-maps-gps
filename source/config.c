@@ -22,7 +22,7 @@ void config_defaults(Config *c)
 	c->start_lon = -3.7038;
 }
 
-static void write_defaults(const Config *c, const char *path)
+void config_save(const Config *c, const char *path)
 {
 	FILE *f = fopen(path, "w");
 	if (!f) return;
@@ -36,7 +36,8 @@ static void write_defaults(const Config *c, const char *path)
 		"udp_port=%d\n"
 		"\n"
 		"# Phone IP for TCP mode (the 3DS connects to an NMEA server on the phone,\n"
-		"# e.g. GPS2IP on iPhone). 'auto' = the hotspot gateway, 'off' = disabled.\n"
+		"# e.g. Share GPS or GPS2IP). 'auto' = find it on the hotspot, 'off' = disabled.\n"
+		"# You can also change it in the app: Info > Phone IP.\n"
 		"phone_ip=%s\n"
 		"tcp_port=%d\n"
 		"\n"
@@ -72,7 +73,7 @@ void config_load(Config *c, const char *path)
 	mkdir(APP_DIR, 0777);
 
 	FILE *f = fopen(path, "r");
-	if (!f) { write_defaults(c, path); return; }
+	if (!f) { config_save(c, path); return; }
 
 	char line[400];
 	while (fgets(line, sizeof(line), f)) {
