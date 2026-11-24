@@ -20,4 +20,6 @@ typedef struct {
 void gps_net_init(GpsNet *g, const Config *cfg);
 /* Non-blocking; call once per frame. Returns true if the fix changed. */
 bool gps_net_poll(GpsNet *g);
+/* Change the phone address ("auto", an IP, or "off") and reconnect. */
+void gps_net_set_phone(GpsNet *g, const char *phone_ip);
 void gps_net_exit(GpsNet *g);

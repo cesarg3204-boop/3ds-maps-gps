@@ -14,7 +14,11 @@
 static int udp_fd = -1;
 static int tcp_fd = -1;
 static struct sockaddr_in tcp_addr;
-static struct sockaddr_in cand[4];   /* phone addresses to try, in turn */
+static struct sockaddr_in cand[8];   /* phone addresses to try, in turn */
+static char cur_phone_ip[64];
+static int cur_tcp_port;
+static uint32_t cur_ip;              /* 3DS IP the candidates were built for */
+static uint64_t ip_check_at;
 static int n_cand, cand_idx;
 
 static void use_candidate(GpsNet *g)
@@ -38,6 +42,87 @@ static void set_nonblock(int fd)
 	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 }
 
+/* The default gateway from the 3DS routing table (0 if none yet). */
+static uint32_t default_gateway(void)
+{
+	static SOCU_RoutingTableEntry rt[16];
+	socklen_t len = sizeof(rt);
+	if (SOCU_GetNetworkOpt(SOL_CONFIG, NETOPT_ROUTING_TABLE, rt, &len) != 0) return 0;
+	int n = len / sizeof(rt[0]);
+	for (int i = 0; i < n && i < 16; i++)
+		if ((rt[i].flags & ROUTING_FLAG_G) && rt[i].dest_ip.s_addr == 0 && rt[i].gateway.s_addr)
+			return rt[i].gateway.s_addr;
+	for (int i = 0; i < n && i < 16; i++)
+		if ((rt[i].flags & ROUTING_FLAG_G) && rt[i].gateway.s_addr)
+			return rt[i].gateway.s_addr;
+	return 0;
+}
+
+static void add_cand(uint32_t host, int port)
+{
+	if (!host || n_cand >= (int)(sizeof(cand) / sizeof(cand[0]))) return;
+	for (int i = 0; i < n_cand; i++)
+		if (cand[i].sin_addr.s_addr == host && ntohs(cand[i].sin_port) == port) return;
+	struct sockaddr_in *c = &cand[n_cand++];
+	memset(c, 0, sizeof(*c));
+	c->sin_family = AF_INET;
+	c->sin_port = htons(port);
+	c->sin_addr.s_addr = host;
+}
+
+/* (Re)build the list of phone addresses the TCP client tries, in turn. */
+static void setup_tcp(GpsNet *g, const char *phone_ip, int tcp_port)
+{
+	snprintf(cur_phone_ip, sizeof(cur_phone_ip), "%s", phone_ip);
+	cur_tcp_port = tcp_port;
+	if (tcp_fd >= 0) close(tcp_fd);
+	tcp_fd = -1;
+	nmea_stream_init(&tcp_stream);
+
+	struct in_addr ip = {0}, mask = {0}, bcast = {0};
+	SOCU_GetIPInfo(&ip, &mask, &bcast);
+	cur_ip = ip.s_addr;
+	snprintf(g->my_ip, sizeof(g->my_ip), "%s", ip.s_addr ? inet_ntoa(ip) : "not connected");
+
+	tcp_enabled = false;
+	g->tcp_state = TCP_OFF;
+	n_cand = 0;
+	if (!phone_ip[0] || strcmp(phone_ip, "off") == 0) return;
+
+	bool aut = strcmp(phone_ip, "auto") == 0;
+	uint32_t hosts[3];
+	int nh = 0;
+	if (aut) {
+		/* On a phone hotspot the phone is the gateway: ask the 3DS for it,
+		 * and also try .1 of our subnet. 127.0.0.1 covers an emulator
+		 * running on the phone itself. */
+		uint32_t gw = default_gateway();
+		if (gw) hosts[nh++] = gw;
+		if (ip.s_addr) hosts[nh++] = (ip.s_addr & mask.s_addr) | htonl(1);
+		hosts[nh++] = htonl(0x7F000001);
+	} else {
+		struct in_addr a;
+		if (inet_aton(phone_ip, &a)) hosts[nh++] = a.s_addr;
+	}
+	/* the configured port, plus Share GPS's default (50000) */
+	int ports[2] = { tcp_port, 50000 };
+	int np = tcp_port != 50000 ? 2 : 1;
+	for (int hi = 0; hi < nh; hi++)
+		for (int pi = 0; pi < np; pi++) add_cand(hosts[hi], ports[pi]);
+	if (n_cand > 0) {
+		tcp_enabled = true;
+		g->tcp_state = TCP_WAITING;
+		cand_idx = 0;
+		use_candidate(g);
+	}
+	tcp_retry_at = 0;
+}
+
+void gps_net_set_phone(GpsNet *g, const char *phone_ip)
+{
+	setup_tcp(g, phone_ip, cur_tcp_port);
+}
+
 void gps_net_init(GpsNet *g, const Config *cfg)
 {
 	memset(g, 0, sizeof(*g));
@@ -46,9 +131,6 @@ void gps_net_init(GpsNet *g, const Config *cfg)
 	nmea_stream_init(&tcp_stream);
 	strcpy(g->source, "-");
 
-	struct in_addr ip = {0}, mask = {0}, bcast = {0};
-	SOCU_GetIPInfo(&ip, &mask, &bcast);
-	snprintf(g->my_ip, sizeof(g->my_ip), "%s", inet_ntoa(ip));
 
 	/* UDP listener: phone apps / scripts push NMEA to <3DS ip or broadcast>:udp_port */
 	udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -84,41 +166,7 @@ void gps_net_init(GpsNet *g, const Config *cfg)
 		}
 	}
 
-	/* TCP client: the 3DS connects to an NMEA server running on the phone */
-	tcp_enabled = false;
-	g->tcp_state = TCP_OFF;
-	if (cfg->phone_ip[0] && strcmp(cfg->phone_ip, "off") != 0) {
-		uint32_t hosts[2];
-		int nh = 0;
-		if (strcmp(cfg->phone_ip, "auto") == 0) {
-			/* On a phone hotspot the phone is the gateway (almost always .1).
-			 * 127.0.0.1 covers an emulator running on the phone itself. */
-			if (ip.s_addr) hosts[nh++] = (ip.s_addr & mask.s_addr) | htonl(1);
-			hosts[nh++] = htonl(0x7F000001);
-		} else {
-			struct in_addr a;
-			if (inet_aton(cfg->phone_ip, &a)) hosts[nh++] = a.s_addr;
-		}
-		/* try the configured port, plus Share GPS's default when auto-detecting */
-		int ports[2] = { cfg->tcp_port, 50000 };
-		int np = (strcmp(cfg->phone_ip, "auto") == 0 && cfg->tcp_port != 50000) ? 2 : 1;
-		n_cand = 0;
-		for (int pi = 0; pi < np; pi++)
-			for (int hi = 0; hi < nh; hi++) {
-				struct sockaddr_in *c = &cand[n_cand++];
-				memset(c, 0, sizeof(*c));
-				c->sin_family = AF_INET;
-				c->sin_port = htons(ports[pi]);
-				c->sin_addr.s_addr = hosts[hi];
-			}
-		if (n_cand > 0) {
-			tcp_enabled = true;
-			g->tcp_state = TCP_WAITING;
-			cand_idx = 0;
-			use_candidate(g);
-		}
-	}
-	tcp_retry_at = 0;
+	setup_tcp(g, cfg->phone_ip, cfg->tcp_port);
 }
 
 static void tcp_drop(GpsNet *g)
@@ -257,6 +305,15 @@ bool gps_net_poll(GpsNet *g)
 	}
 
 	if (http_poll(g)) changed = true;
+
+	/* Wi-Fi may come up (or change network) after the app starts:
+	 * rebuild the phone addresses when the 3DS IP changes. */
+	if (osGetTime() >= ip_check_at && g->tcp_state != TCP_CONNECTED) {
+		ip_check_at = osGetTime() + 3000;
+		struct in_addr ip = {0}, mask = {0}, bcast = {0};
+		SOCU_GetIPInfo(&ip, &mask, &bcast);
+		if (ip.s_addr != cur_ip) setup_tcp(g, cur_phone_ip, cur_tcp_port);
+	}
 
 	if (tcp_enabled) {
 		uint64_t now = osGetTime();
