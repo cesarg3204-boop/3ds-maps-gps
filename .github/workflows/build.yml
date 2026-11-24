@@ -2,6 +2,8 @@ name: Build
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
 
 jobs:
@@ -12,10 +14,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build 3dsmaps.3dsx
         run: make
+      - name: Get CIA tools
+        run: |
+          mkdir -p /tmp/tools && cd /tmp/tools
+          curl -sSLf -o makerom.zip https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip
+          curl -sSLf -o bannertool.zip https://github.com/Epicpkmn11/bannertool/releases/download/v1.2.2/bannertool.zip
+          unzip -q makerom.zip && unzip -q -j bannertool.zip linux-x86_64/bannertool
+          chmod +x makerom bannertool
+      - name: Build 3dsmaps.cia
+        run: MAKEROM=/tmp/tools/makerom BANNERTOOL=/tmp/tools/bannertool ./tools/make_cia.sh
       - uses: actions/upload-artifact@v4
         with:
           name: 3dsmaps
-          path: 3dsmaps.3dsx
+          path: |
+            3dsmaps.3dsx
+            3dsmaps.cia
 
   test:
     runs-on: ubuntu-latest
@@ -25,3 +38,33 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libjansson-dev
       - name: Unit tests
         run: make -C tests
+
+  # Every push to main (or a v* tag) publishes the release for the version in
+  # VERSION, replacing its files with the new build. The FBI QR code in the
+  # README points at the latest release's .cia, so it always gets the newest.
+  release:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3dsmaps
+      - name: Read version
+        id: ver
+        run: echo "tag=v$(cat VERSION)" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: 3DS Maps ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            Install with FBI: Remote Install → Scan QR Code, and scan the QR code in the README.
+            Or copy 3dsmaps.3dsx to SD:/3ds/3dsmaps/ and open it from the Homebrew Launcher.
+          files: |
+            3dsmaps.cia
+            3dsmaps.3dsx

@@ -7,3 +7,6 @@ tests/test_main
 tests/preview/preview
 tests/preview/out/
 __pycache__/
+*.cia
+cia/*.bnr
+cia/*.icn
