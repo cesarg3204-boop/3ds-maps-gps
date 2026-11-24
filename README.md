@@ -12,8 +12,9 @@ OpenStreetMap map with a live blue dot for where you are.
   **walking**, and tap **Go**.
 * Turn-by-turn directions with arrows, distance to the next turn, time left and
   arrival time. If you go off the route, it finds a new one.
-* Works with the free Android app **Share GPS** (TCP/IP server mode), any app
-  that sends NMEA GPS data, or just Chrome on the phone.
+* Works with the free Android app **Share GPS** (recommended, see
+  [setup](#android-share-gps-recommended)), any app that sends NMEA GPS data,
+  or just Chrome on the phone.
 
 ```
  phone (GPS)  --Wi-Fi hotspot-->  3DS
@@ -65,9 +66,46 @@ The 3DS accepts location three ways at the same time: from a web page in the pho
 * **UDP push** – the phone sends to the 3DS on port **10110**
   (the 3DS IP is shown on the bottom screen).
 * **TCP pull** – the 3DS connects to an NMEA server on the phone
-  (`phone_ip=auto` means the hotspot gateway, i.e. the phone itself; port `tcp_port=11123`).
+  (`phone_ip=auto` finds the phone on its hotspot; ports `11123` and `50000` are tried).
 
-### Android (easiest: no app needed, just Chrome)
+### Android: Share GPS (recommended)
+
+[**Share GPS**](https://play.google.com/store/apps/details?id=com.jillybunch.shareGPS)
+is a free Android app that shares the phone's GPS over Wi-Fi and keeps running
+with the screen off. It's the easiest way to use 3DS Maps on the go.
+
+**One-time setup**
+
+1. Install **Share GPS** from Google Play and allow location access.
+2. In Share GPS, tap **Add** to create a connection:
+   * Connection type: **TCP/IP**
+   * **Server mode: on** (the 3DS connects to the phone)
+   * Port: leave the default, **50000**
+   * Give it any name, for example `3DS`, and save.
+3. In Android settings → Apps → Share GPS → Battery, choose **Unrestricted**,
+   so Android doesn't stop it when the screen turns off.
+4. Turn on the phone's **Wi-Fi hotspot** with the band set to **2.4 GHz**, and
+   connect the 3DS to it once (System Settings → Internet Settings →
+   Connection Settings → Search for Access Point).
+
+**Every time**
+
+1. Turn on the hotspot.
+2. In Share GPS, start the `3DS` connection.
+3. Open 3DS Maps. It finds the phone by itself: tap **Info** and the Phone line
+   turns green and says `connected`. The blue dot appears once the phone has a fix.
+
+**If it says "waiting for phone"**
+
+* Make sure the 3DS is on the phone's hotspot, not on another Wi-Fi network.
+  The phone's hotspot screen should list it as a connected device.
+* Check that the Share GPS connection is running (its notification is showing).
+* Tap **Info → Phone IP** and type the phone's IP address on the hotspot, or
+  `auto` to go back to automatic. It is saved for next time.
+* Running 3DS Maps in an emulator on the same phone? `auto` also tries
+  `127.0.0.1`, so no change is needed.
+
+### Android without an app (Chrome)
 
 The 3DS serves a small web page. Chrome on the phone reads your GPS and sends it to the 3DS.
 
@@ -82,8 +120,9 @@ The 3DS serves a small web page. Chrome on the phone reads your GPS and sends it
 The hotspot can give the 3DS a different IP next time. If the page won't load,
 check the address on the 3DS screen and update the Chrome flag if it changed.
 
-Other Android options: an NMEA-over-UDP app pointed at the 3DS IP, port `10110`,
-or the Termux script `phone/phone_gps_sender.py`.
+This only works while the page is open with the screen on, so Share GPS is
+better for real trips. Other Android options: an NMEA-over-UDP app pointed at
+the 3DS IP, port `10110`, or the Termux script `phone/phone_gps_sender.py`.
 
 ### iPhone
 
@@ -222,3 +261,18 @@ phone/             Android (Termux) GPS sender
 tools/             PC tile downloader, fake GPS sender
 tests/             PC unit tests
 ```
+
+## About
+
+3DS Maps is a homebrew project that turns a Nintendo 3DS into a GPS navigator,
+with the phone in your pocket as the GPS receiver. It is not affiliated with
+Nintendo.
+
+* Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
+* Place search by [Nominatim](https://nominatim.org/), routes by
+  [OSRM](https://project-osrm.org/) on routing.openstreetmap.de (FOSSGIS).
+  These are free community services, so please use them gently.
+* Built with [devkitPro](https://devkitpro.org/) (devkitARM, libctru) plus curl,
+  mbedTLS, libpng, zlib and jansson.
+
+Bugs and ideas are welcome in [Issues](https://github.com/cesarg3204-boop/3ds-maps-gps/issues).
