@@ -64,28 +64,39 @@ start it; with the iPhone hotspot on, 3DS Maps connects to it automatically
 `tcp_port` in `config.ini`. Keep the app in the foreground or allowed to run
 in the background.
 
-## Controls
+## Using the app
+
+The **top screen** is the map. The **bottom screen** is a touch screen:
+
+* **Home**: a big **Where to?** button, a **Car / Walk** switch, **Follow me**,
+  zoom **- / +**, and **Info**.
+* **Results**: places as cards (tap to see one on the map, arrows to scroll),
+  the Car / Walk switch, and a green **Go** button.
+* **Navigating**: the next turn with a big arrow and the distance to it, the
+  turn after that, distance and time left, and the arrival time. Buttons:
+  **End**, **Car/Walk** (switching gets a new route), **New** search.
+* **Info**: GPS details, the 3DS IP, the phone connection, the phone page
+  address, tile status, and the tiles online/offline switch.
+
+Buttons still work too:
 
 | Button | Action |
 |---|---|
-| Circle Pad / D-Pad / drag on touch screen | Move the map (stops following) |
-| R / ZR | Zoom in |
-| L / ZL | Zoom out |
-| A | Follow GPS again |
+| Circle Pad / D-Pad | Move the map (stops following) |
+| R / ZR, L / ZL | Zoom in / out |
+| A | Follow GPS (on results: Go) |
+| X | Search |
+| Y | On results: switch Car / Walk |
+| B | Back |
 | SELECT | Tile downloading on/off |
-| X | Search a place and get directions |
-| B | End the current route |
 | START | Quit (remembers where you were) |
-
-The bottom screen shows: fix status, lat/lon, speed, course, satellites,
-the 3DS IP, the phone connection, and tile download status.
 
 ## Search and directions
 
-Press **X**, type where you want to go (an address, a street, or a place like
-"Prado Museum"), and press Search. Results near you come first and show as pins
-on the map. Choose one with Up/Down, then press **A** for car directions or
-**Y** for walking directions.
+Tap **Where to?** (or press X), type where you want to go (an address, a
+street, or a place like "Prado Museum"), and press Search. Results near you come
+first and show as numbered pins on the map. Tap one, pick Car or Walk, and tap
+**Go**.
 
 While navigating, the top of the map shows the next turn with an arrow and the
 distance to it, and the bottom screen shows the turn after that plus the
@@ -149,7 +160,11 @@ Needs devkitPro (devkitARM, libctru, and the 3ds-curl, 3ds-mbedtls, 3ds-libpng,
 docker run --rm -v "$PWD":/src -w /src devkitpro/devkitarm make
 ```
 
-PC unit tests (NMEA parser, map drawing, map maths): `make -C tests`.
+PC unit tests (NMEA parser, map drawing, map maths, search/route parsing): `make -C tests`.
+
+Screen previews on a PC (renders every bottom-screen page to PNG): `make -C tests/preview`.
+
+Every push is built by GitHub Actions; download `3dsmaps.3dsx` from the run's artifacts.
 
 ## Files
 
